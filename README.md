@@ -2,6 +2,8 @@
 
 Connects to LCDd.
 
+<img width="1280" height="960" alt="5773936205346050570" src="https://github.com/user-attachments/assets/ba29fb2c-9625-4244-9a4e-f7690f8ed3ee" />
+
 Five rotating screens on the 20x4 display attached to a Proxmox VE host: node name
 and uptime and load, CPU and RAM, VM/container counts, storage usage (scrollable when
 there are more volumes than rows), and the network interface this node routes through
