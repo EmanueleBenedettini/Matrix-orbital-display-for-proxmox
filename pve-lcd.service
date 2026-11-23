@@ -1,0 +1,59 @@
+[Unit]
+Description=pve-lcd - Proxmox VE status screens on an LCDproc display
+After=network-online.target LCDd.service
+Wants=LCDd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pve-lcd.py
+Environment=PVELCD_REFRESH=2
+
+# How often the expensive sources are polled, in seconds.  Every pvesh call is a
+# Perl process that loads the whole Proxmox API, and it runs inside this unit's
+# cgroup, so its CPU is charged to pve-lcd.service.  The panel repaints every
+# PVELCD_REFRESH seconds for free (strings to a socket); these three are what
+# the display actually costs the node.  Raise them, or use GUEST_SOURCE=files
+# below:  systemctl edit pve-lcd.service   then   systemctl restart pve-lcd.service
+Environment=PVELCD_GUEST_TTL=30
+Environment=PVELCD_STORAGE_TTL=180
+Environment=PVELCD_CLUSTER_TTL=60
+# Log a journal line for any pvesh call slower than this (0 logs every call), so
+# the cost can be read out of the journal instead of guessed at:
+#   journalctl -u pve-lcd.service | grep 'pvesh'
+Environment=PVELCD_SLOW_PVESH=1.5
+# Read the VM/container screen from /etc/pve and never run pvesh for it.  Removes
+# 2 of the 3 pvesh calls; the tradeoff is that the status in those files is what
+# pvedaemon last recorded, so it can lag a few seconds behind reality.
+# Environment=PVELCD_GUEST_SOURCE=files
+
+# The Network screen costs no polling at all: it reads /proc/net/dev, /proc/net/route,
+# /sys/class/net and one socket ioctl.  This is only how often the interface details
+# (address, gateway, speed, MTU) are re-read; the rx/tx bandwidth is measured from two
+# counter samples taken on the ordinary refresh, so it is free.
+Environment=PVELCD_NET_TTL=60
+# Force one interface instead of the interface the default route uses:
+# Environment=PVELCD_NET_IFACE=vmbr0
+
+# Buttons and screen rotation.  install.sh keys-nav/keys-menu/keys-map write the first
+# two into /etc/systemd/system/pve-lcd.service.d/20-buttons.conf, which overrides them, so
+# leave these commented unless you are doing it by hand.
+#   PVELCD_KEYS      key names this client asks LCDd for; they must match the KeyMap_
+#                    names in /etc/LCDd.conf (empty = the client ignores the buttons)
+#   PVELCD_ROTATION  client = this program rotates the screens itself, so the panel
+#                    starts changing screens at boot without a key press;
+#                    lcdproc = LCDd rotates them, which needs AutoRotate=yes in LCDd.conf
+#   PVELCD_NOTICE_SECONDS  how long `| Hold` / `| Rotate` / `| Prev` / `| Next` stays
+#                    over the end of the bottom row after a button changed the screen
+#                    (2.5 by default, 0 never writes it)
+# Environment=PVELCD_KEYS="Up Down Left Right Enter"
+# Environment=PVELCD_ROTATION=client
+# Environment=PVELCD_NOTICE_SECONDS=2.5
+
+Restart=always
+RestartSec=5
+Nice=10
+# Run as root (the default): the client reads /etc/pve and runs pvesh,
+# both of which are root-only on Proxmox.
+
+[Install]
+WantedBy=multi-user.target
